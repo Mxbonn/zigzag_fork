@@ -16,7 +16,7 @@ from multiprocessing import Pool, Process, cpu_count
 from datetime import datetime
 from pathlib import Path
 from itertools import repeat
-from classes.layer_rounding import mem_access_count_correct
+from classes.layer_rounding import mem_access_count_correct, greedy_mapping_with_fixed_su
 from im2col_funcs import pw_layer_col2im
 from output_funcs import CommonSetting, print_xml, print_yaml
 import loma
@@ -185,10 +185,18 @@ def mem_scheme_su_evaluate(input_settings, layer_, im2col_layer, layer_index, la
                                                                     layer_post)
         spatial_loop_comb = [spatial_loop, spatial_loop_fractional]
     else:
-        layer_post = layer_info[layer_index]
+        ''' modeling new HW architectures with complex fixed spatial unrollings '''
+        layer_post, mem_scheme.fraction_spatial_unrolling, mem_scheme.footer_info, mem_scheme.greedy_mapping_flag = \
+            greedy_mapping_with_fixed_su(layer_info[layer_index], mem_scheme.spatial_unrolling[ii_su])
         spatial_loop = cls.SpatialLoop.extract_loop_info(mem_scheme.spatial_unrolling[ii_su], layer_post)
-        spatial_loop_fractional = None
-        spatial_loop_comb = [spatial_loop, spatial_loop]
+        spatial_loop_fractional = cls.SpatialLoop.extract_loop_info(mem_scheme.fraction_spatial_unrolling,
+                                                                    layer_post)
+        spatial_loop_comb = [spatial_loop, spatial_loop_fractional]
+
+        # layer_post = layer_info[layer_index]
+        # spatial_loop = cls.SpatialLoop.extract_loop_info(mem_scheme.spatial_unrolling[ii_su], layer_post)
+        # spatial_loop_fractional = None
+        # spatial_loop_comb = [spatial_loop, spatial_loop]
 
     # TODO MAC area (multiplier and adder area) is not included.
     # occupied_area format: [total_area, active_area]

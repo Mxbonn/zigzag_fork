@@ -333,5 +333,49 @@ def mem_access_count_correct(loop_fractional, loop):
     return loop_fractional
 
 
+def greedy_mapping_with_fixed_su(layer, fixed_su):
+    layer_post = deepcopy(layer)
+    LUT = {7: 'B', 6: 'K', 5: 'C', 4: 'OY', 3: 'OX', 2: 'FY', 1: 'FX'}
+    su_dim_size_collect = {'W': {7: 1, 6: 1, 5: 1, 4: 1, 3: 1, 2: 1, 1: 1},
+                           'I': {7: 1, 6: 1, 5: 1, 4: 1, 3: 1, 2: 1, 1: 1},
+                           'O': {7: 1, 6: 1, 5: 1, 4: 1, 3: 1, 2: 1, 1: 1}}
+    fraction_spatial_unrolling = deepcopy(fixed_su)
+    footer_info = {'B': 0, 'K': 0, 'C': 0, 'OY': 0, 'OX': 0, 'FY': 0, 'FX': 0}
+    greedy_mapping_flag = False
+
+    # Extract SU size for each dimension
+    for op in ['W', 'I', 'O']:
+        for lv in fixed_su[op]:
+            if lv:
+                for su_tp in lv:
+                    su_dim_size_collect[op][su_tp[0]] *= su_tp[1]
+
+    # check if the su from all operands consist
+    assert su_dim_size_collect['W'] == su_dim_size_collect['I'] == su_dim_size_collect['O']
+    su_dim_size_collect = su_dim_size_collect['W']
+
+    # Compare the SU size with layer size
+    for su_tp in su_dim_size_collect.items():
+        if su_tp[1] > 1:
+            footer = layer[LUT[su_tp[0]]] % su_tp[1]
+            if footer != 0:
+                greedy_mapping_flag = True
+                footer_info[LUT[su_tp[0]]] = footer
+                mapping_time = (layer[LUT[su_tp[0]]] // su_tp[1])+1
+                lp_rounding = mapping_time * su_tp[1]
+                su_fraction = layer[LUT[su_tp[0]]]/mapping_time
+                layer_post[LUT[su_tp[0]]] = lp_rounding
+                for op in ['W', 'I', 'O']:
+                    accu_tp = 1
+                    for lv_idx, _ in enumerate(fixed_su[op]):
+                        if fraction_spatial_unrolling[op][lv_idx]:
+                            for tp_idx, tp in enumerate(fraction_spatial_unrolling[op][lv_idx]):
+                                if tp[0] == su_tp[0]:
+                                    if su_dim_size_collect[tp[0]] == accu_tp*tp[1]:
+                                        fraction_spatial_unrolling[op][lv_idx][tp_idx] = (tp[0], su_fraction/accu_tp)
+                                    else:
+                                        accu_tp *= tp[1]
+
+    return layer_post, fraction_spatial_unrolling, footer_info, greedy_mapping_flag
 
 
