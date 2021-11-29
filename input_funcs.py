@@ -1,8 +1,6 @@
-import yaml
-import sys
-from msg import MemoryNode, MemorySchemeNode, MemoryScheme
 import importlib.machinery
-# import keras
+
+from msg import MemoryNode, MemorySchemeNode
 
 
 class InputSettings:
@@ -17,7 +15,6 @@ class InputSettings:
                  stationary_optimization_enable, su_parallel_processing, arch_search_result_saving, su_search_result_saving,
                  tm_search_result_saving, result_print_mode, im2col_enable_all, im2col_enable_pw, memory_unroll_fully_flexible,
                  result_print_type, save_results_on_the_fly, max_nb_lpf_layer):
-
         self.results_path = results_path
         self.results_filename = results_filename
         self.layer_filename = layer_filename
@@ -75,81 +72,76 @@ class InputSettings:
         self.max_nb_lpf_layer = max_nb_lpf_layer
 
 
-def get_input_settings(setting_path, mapping_path, memory_pool_path, architecure_path):
-    settings_file = open(setting_path)
-    memory_pool_file = open(memory_pool_path)
-    architecture_file = open(architecure_path)
-    mapping_file = open(mapping_path)
-    fl = yaml.full_load(settings_file)
-
-    if fl['result_print_mode'] not in ['concise', 'complete']:
+def get_input_settings(settings_cfg, mapping_cfg, memory_pool_cfg, architecture_cfg):
+    if settings_cfg['result_print_mode'] not in ['concise', 'complete']:
         raise ValueError('result_print_mode is not correctly set. Please check the setting file.')
 
-    if fl['result_print_type'] not in ['xml', 'yaml']:
+    if settings_cfg['result_print_type'] not in ['xml', 'yaml']:
         raise ValueError('result_print_type is not correctly set. Please check the setting file.')
 
-    tm_fixed_flag = fl['fixed_temporal_mapping']
-    sm_fixed_flag = fl['fixed_spatial_unrolling']
-    arch_fixed_flag = fl['fixed_architecture']
-    fl = yaml.full_load(memory_pool_file)
+    tm_fixed_flag = settings_cfg['fixed_temporal_mapping']
+    sm_fixed_flag = settings_cfg['fixed_spatial_unrolling']
+    arch_fixed_flag = settings_cfg['fixed_architecture']
     memory_pool = []
-    for m in fl:
-        mt = fl[m]['mem_type']
+    for m in memory_pool_cfg:
+        mt = memory_pool_cfg[m]['mem_type']
         mt_tmp = 0
-        if mt == 'dual_port_double_buffered': mt_tmp = 3
-        elif mt == 'dual_port_single_buffered': mt_tmp = 2
-        elif mt == 'single_port_double_buffered': mt_tmp = 1
+        if mt == 'dual_port_double_buffered':
+            mt_tmp = 3
+        elif mt == 'dual_port_single_buffered':
+            mt_tmp = 2
+        elif mt == 'single_port_double_buffered':
+            mt_tmp = 1
         if mt_tmp == 0:
             raise ValueError("In memory pool, some memory's memory type is not correctly defined.")
         mbw = []
-        for mb in fl[m]['mem_bw']:
+        for mb in memory_pool_cfg[m]['mem_bw']:
             mbw.append([mb, mb])
         try:
-            mem_utilization_rate = fl[m]['utilization_rate']
+            mem_utilization_rate = memory_pool_cfg[m]['utilization_rate']
         except:
             mem_utilization_rate = 0.7
         m_tmp = {
             'name': m,
-            'size_bit': fl[m]['size_bit'],
+            'size_bit': memory_pool_cfg[m]['size_bit'],
             'mem_bw': mbw,
-            'area': fl[m]['area'],
+            'area': memory_pool_cfg[m]['area'],
             'utilization_rate': mem_utilization_rate,
             'mem_type': mt_tmp,
-            'cost': [list(a) for a in zip(fl[m]['cost']['read_word'], fl[m]['cost']['write_word'])],
+            'cost': [list(a) for a in zip(memory_pool_cfg[m]['cost']['read_word'], memory_pool_cfg[m]['cost']['write_word'])],
             'unroll': 1,
             'mem_fifo': False
         }
         memory_pool.append(m_tmp)
-    fl = yaml.full_load(architecture_file)
     try:
-        memory_unroll_fully_flexible = fl['memory_unroll_fully_flexible']
+        memory_unroll_fully_flexible = architecture_cfg['memory_unroll_fully_flexible']
     except:
         memory_unroll_fully_flexible = False
-    L1_size = fl['L1_size']
-    L2_size = fl['L2_size']
-    banking = fl['banking']
-    area_max_arch = fl['area_max']
-    area_utilization_arch = fl['area_utilization']
-    mem_ratio = fl['mem_ratio']
-    PE_depth = fl['PE_memory_depth']
-    CHIP_depth = fl['CHIP_memory_depth']
-    PE_RF_size_threshold = fl['PE_threshold']
+    L1_size = architecture_cfg['L1_size']
+    L2_size = architecture_cfg['L2_size']
+    banking = architecture_cfg['banking']
+    area_max_arch = architecture_cfg['area_max']
+    area_utilization_arch = architecture_cfg['area_utilization']
+    mem_ratio = architecture_cfg['mem_ratio']
+    PE_depth = architecture_cfg['PE_memory_depth']
+    CHIP_depth = architecture_cfg['CHIP_memory_depth']
+    PE_RF_size_threshold = architecture_cfg['PE_threshold']
     mac_array_info = {}
     mac_array_stall = {}
-    mac_array_info['array_size'] = [fl['PE_array']['Col'], fl['PE_array']['Row']]
+    mac_array_info['array_size'] = [architecture_cfg['PE_array']['Col'], architecture_cfg['PE_array']['Row']]
     memory_scheme_hint = MemorySchemeNode([])
     mh_name = {'W': [], 'I': [], 'O': []}
 
     if arch_fixed_flag:
-        for m in fl['memory_hierarchy']:
-            m_tmp = [x for x in memory_pool if x['name'] == fl['memory_hierarchy'][m]['memory_instance']]
+        for m in architecture_cfg['memory_hierarchy']:
+            m_tmp = [x for x in memory_pool if x['name'] == architecture_cfg['memory_hierarchy'][m]['memory_instance']]
             if not m_tmp:
                 raise Exception("Memory instance " + str(m) + " in hierarchy is not found in memory pool")
             m_tmp = m_tmp[0]
             m_tmp = MemoryNode(m_tmp, (), 0, 1, m)
-            m_tmp.memory_level['unroll'] = fl['memory_hierarchy'][m]['memory_unroll']
+            m_tmp.memory_level['unroll'] = architecture_cfg['memory_hierarchy'][m]['memory_unroll']
             m_tmp.memory_level['nbanks'] = None
-            m_tmp.operand = tuple(fl['memory_hierarchy'][m]['operand_stored'])
+            m_tmp.operand = tuple(architecture_cfg['memory_hierarchy'][m]['operand_stored'])
             memory_scheme_hint.memory_scheme.add(m_tmp)
             for operand in ['W', 'I', 'O']:
                 if operand in m_tmp.operand:
@@ -158,24 +150,24 @@ def get_input_settings(setting_path, mapping_path, memory_pool_path, architecure
             mh_name[operand].sort(key=lambda tup: tup[1])
             mh_name[operand] = [x[0] for x in mh_name[operand]]
     else:
-        if fl['memory_hint']:
-            for m in fl['memory_hint']:
-                m_tmp = [x for x in memory_pool if x['name'] == fl['memory_hint'][m]['memory_instance']]
+        if architecture_cfg['memory_hint']:
+            for m in architecture_cfg['memory_hint']:
+                m_tmp = [x for x in memory_pool if x['name'] == architecture_cfg['memory_hint'][m]['memory_instance']]
                 if not m_tmp:
                     raise Exception("Memory instance " + str(m) + " in hint is not found in memory pool")
                 m_tmp = m_tmp[0]
                 memory_pool.remove(m_tmp)
                 m_tmp = MemoryNode(m_tmp, (), 0, 1)
-                m_tmp.memory_level['unroll'] = fl['memory_hint'][m]['memory_unroll']
+                m_tmp.memory_level['unroll'] = architecture_cfg['memory_hint'][m]['memory_unroll']
                 m_tmp.memory_level['nbanks'] = 1
-                m_tmp.operand = tuple(fl['memory_hint'][m]['operand_stored'])
+                m_tmp.operand = tuple(architecture_cfg['memory_hint'][m]['operand_stored'])
 
                 memory_scheme_hint.memory_scheme.add(m_tmp)
 
-    precision = {'W': fl['precision']['W'], 'I': fl['precision']['I'], 'O': fl['precision']['O_partial'],
-                 'O_final': fl['precision']['O_final']}
-    mac_array_info['single_mac_energy'] = fl['single_mac_energy_active']
-    mac_array_info['idle_mac_energy'] = fl['single_mac_energy_idle']
+    precision = {'W': architecture_cfg['precision']['W'], 'I': architecture_cfg['precision']['I'], 'O': architecture_cfg['precision']['O_partial'],
+                 'O_final': architecture_cfg['precision']['O_final']}
+    mac_array_info['single_mac_energy'] = architecture_cfg['single_mac_energy_active']
+    mac_array_info['idle_mac_energy'] = architecture_cfg['single_mac_energy_idle']
     p_aux = [precision['W'], precision['I']]
     mac_array_info['precision'] = max(p_aux)
     mac_array_info['headroom'] = precision['O'] - precision['O_final']
@@ -184,8 +176,7 @@ def get_input_settings(setting_path, mapping_path, memory_pool_path, architecure
     for i in range(0, 10):
         uwe.append(0)
     mac_array_info['unit_wire_energy'] = uwe
-    mac_array_stall['systolic'] = fl['mac_array_stall']['systolic']
-    fl = yaml.full_load(mapping_file)
+    mac_array_stall['systolic'] = architecture_cfg['mac_array_stall']['systolic']
     tm_fixed = {'W': [], 'I': [], 'O': []}
     sm_fixed = {'W': [], 'I': [], 'O': []}
     flooring_fixed = {'W': [], 'I': [], 'O': []}
@@ -194,37 +185,47 @@ def get_input_settings(setting_path, mapping_path, memory_pool_path, architecure
     i2a = {'B': 7, 'K': 6, 'C': 5, 'OY': 4, 'OX': 3, 'FY': 2, 'FX': 1}
     unrolling_scheme_list_text = []
     if tm_fixed_flag:
-        for op in fl['temporal_mapping_fixed']:
-            if op == 'weight': operand = 'W'
-            elif op == 'input': operand = 'I'
-            elif op == 'output': operand = 'O'
-            tm_fixed[operand] = [[] for x in fl['temporal_mapping_fixed'][op]]
-            for ii, lev in enumerate(fl['temporal_mapping_fixed'][op]):
+        for op in mapping_cfg['temporal_mapping_fixed']:
+            if op == 'weight':
+                operand = 'W'
+            elif op == 'input':
+                operand = 'I'
+            elif op == 'output':
+                operand = 'O'
+            tm_fixed[operand] = [[] for x in mapping_cfg['temporal_mapping_fixed'][op]]
+            for ii, lev in enumerate(mapping_cfg['temporal_mapping_fixed'][op]):
                 index_lev = mh_name[operand].index(lev)
-                for pf in fl['temporal_mapping_fixed'][op][lev]:
+                for pf in mapping_cfg['temporal_mapping_fixed'][op][lev]:
                     tm_fixed[operand][index_lev].append(tuple([i2a[pf[0]], pf[1]]))
     if sm_fixed_flag:
-        for op in fl['spatial_mapping_fixed']:
-            if op == 'weight': operand = 'W'
-            elif op == 'input': operand = 'I'
-            elif op == 'output': operand = 'O'
-            sm_fixed[operand] = [[] for x in fl['spatial_mapping_fixed'][op]]
-            flooring_fixed[operand] = [[] for x in fl['spatial_mapping_fixed'][op]]
-            for lev in fl['spatial_mapping_fixed'][op]:
+        for op in mapping_cfg['spatial_mapping_fixed']:
+            if op == 'weight':
+                operand = 'W'
+            elif op == 'input':
+                operand = 'I'
+            elif op == 'output':
+                operand = 'O'
+            sm_fixed[operand] = [[] for x in mapping_cfg['spatial_mapping_fixed'][op]]
+            flooring_fixed[operand] = [[] for x in mapping_cfg['spatial_mapping_fixed'][op]]
+            for lev in mapping_cfg['spatial_mapping_fixed'][op]:
                 ii_lev = 0
-                if lev == 'MAC' : ii_lev = 0
-                else : ii_lev = lev + 1
-                flooring_fixed[operand][ii_lev] = [[] for d in fl['spatial_mapping_fixed'][op][lev]]
-                for dim in fl['spatial_mapping_fixed'][op][lev]:
+                if lev == 'MAC':
+                    ii_lev = 0
+                else:
+                    ii_lev = lev + 1
+                flooring_fixed[operand][ii_lev] = [[] for d in mapping_cfg['spatial_mapping_fixed'][op][lev]]
+                for dim in mapping_cfg['spatial_mapping_fixed'][op][lev]:
                     ii_dim = 0
-                    if dim == 'Col': ii_dim = 0
-                    elif dim == 'Row': ii_dim = 1
-                    for pf in fl['spatial_mapping_fixed'][op][lev][dim]:
+                    if dim == 'Col':
+                        ii_dim = 0
+                    elif dim == 'Row':
+                        ii_dim = 1
+                    for pf in mapping_cfg['spatial_mapping_fixed'][op][lev][dim]:
                         sm_fixed[operand][ii_lev].append(tuple([i2a[pf[0]], pf[1]]))
                         flooring_fixed[operand][ii_lev][ii_dim].append(i2a[pf[0]])
     else:
-        unrolling_scheme_list_text = fl['spatial_mapping_list']
-        for us in fl['spatial_mapping_list']:
+        unrolling_scheme_list_text = mapping_cfg['spatial_mapping_list']
+        for us in mapping_cfg['spatial_mapping_list']:
             unrolling_scheme_list.append([])
             unrolling_scheme_list[-1] = [[] for x in us]
             unrolling_size_list.append([])
@@ -232,8 +233,10 @@ def get_input_settings(setting_path, mapping_path, memory_pool_path, architecure
             for dim in us:
                 ii_dim = 0
                 dimx = next(iter(dim))
-                if dimx == 'Col': ii_dim = 0
-                elif dimx == 'Row': ii_dim = 1
+                if dimx == 'Col':
+                    ii_dim = 0
+                elif dimx == 'Row':
+                    ii_dim = 1
                 for pf in dim[dimx]:
                     pf_type = list(pf.split('_'))[0]
                     unrolling_scheme_list[-1][ii_dim].append(i2a[pf_type])
@@ -244,25 +247,23 @@ def get_input_settings(setting_path, mapping_path, memory_pool_path, architecure
                         pf_size = None
                         unrolling_size_list[-1][ii_dim].append(pf_size)
 
-    settings_file = open(setting_path)
-    fl = yaml.full_load(settings_file)
-    if fl['temporal_mapping_search_method'] == 'exhaustive':
+    if settings_cfg['temporal_mapping_search_method'] == 'exhaustive':
         tmg_search_method = 1
         stationary_optimization_enable = False
         data_reuse_threshold = 0
-    elif fl['temporal_mapping_search_method'] == 'iterative':
+    elif settings_cfg['temporal_mapping_search_method'] == 'iterative':
         tmg_search_method = 0
         stationary_optimization_enable = True
         data_reuse_threshold = 1
-    elif fl['temporal_mapping_search_method'] == 'heuristic_v1':
+    elif settings_cfg['temporal_mapping_search_method'] == 'heuristic_v1':
         tmg_search_method = 1
         stationary_optimization_enable = True
         data_reuse_threshold = 0
-    elif fl['temporal_mapping_search_method'] == 'heuristic_v2':
+    elif settings_cfg['temporal_mapping_search_method'] == 'heuristic_v2':
         tmg_search_method = 1
         stationary_optimization_enable = True
         data_reuse_threshold = 1
-    elif fl['temporal_mapping_search_method'] == 'loma':
+    elif settings_cfg['temporal_mapping_search_method'] == 'loma':
         tmg_search_method = 2
         stationary_optimization_enable = None
         data_reuse_threshold = None
@@ -271,12 +272,12 @@ def get_input_settings(setting_path, mapping_path, memory_pool_path, architecure
 
     # Temporal mapping search space: even or uneven
     try:
-        if fl['temporal_mapping_search_space'] == 'even':
-            if tmg_search_method == 2: # Only allow even mapping when doing LOMA
+        if settings_cfg['temporal_mapping_search_space'] == 'even':
+            if tmg_search_method == 2:  # Only allow even mapping when doing LOMA
                 tmg_search_space = 'even'
             else:
                 raise ValueError('temporal_mapping_search_space = even is only allowed for LOMA search.')
-        elif fl['temporal_mapping_search_space'] == 'uneven':
+        elif settings_cfg['temporal_mapping_search_space'] == 'uneven':
             tmg_search_space = 'uneven'
         else:
             raise ValueError('temporal_mapping_search_space is not correctly set. Please check the setting file.')
@@ -285,45 +286,45 @@ def get_input_settings(setting_path, mapping_path, memory_pool_path, architecure
         tmg_search_space = 'uneven'
 
     sumode = ['exhaustive', 'heuristic_v1', 'heuristic_v2', 'hint_driven', 'greedy_mapping_with_hint', 'greedy_mapping_without_hint']
-    if not fl['fixed_spatial_unrolling']:
-        sumx = sumode.index(fl['spatial_unrolling_search_method'])
+    if not settings_cfg['fixed_spatial_unrolling']:
+        sumx = sumode.index(settings_cfg['spatial_unrolling_search_method'])
     else:
         sumx = 0
 
-    if type(fl['layer_indices']) is list:
-        layer_indices = fl['layer_indices']
+    if type(settings_cfg['layer_indices']) is list:
+        layer_indices = settings_cfg['layer_indices']
     else:
-        NN = importlib.machinery.SourceFileLoader('%s' % (fl['layer_filename']), '%s.py' % (fl['layer_filename'])).load_module()
+        NN = importlib.machinery.SourceFileLoader('%s' % (settings_cfg['layer_filename']), '%s.py' % (settings_cfg['layer_filename'])).load_module()
         layer_indices = [kk for kk in NN.layer_info.keys()]
 
     try:
-        save_results_on_the_fly = fl['save_results_on_the_fly']
+        save_results_on_the_fly = settings_cfg['save_results_on_the_fly']
     except:
         save_results_on_the_fly = False
     try:
-        max_nb_lpf_layer = fl['max_nb_lpf_layer']
+        max_nb_lpf_layer = settings_cfg['max_nb_lpf_layer']
     except:
         max_nb_lpf_layer = 20
 
-    input_settings = InputSettings(fl['result_path'], fl['result_filename'], fl['layer_filename'],
-                                   layer_indices, fl['layer_multiprocessing'], precision,
-                                   mac_array_info, mac_array_stall, fl['fixed_architecture'],
-                                   fl['architecture_search_multiprocessing'], memory_scheme_hint,
-                                   fl['fixed_spatial_unrolling'], sm_fixed, flooring_fixed,
-                                   fl['fixed_temporal_mapping'], tm_fixed, tmg_search_method,
-                                   tmg_search_space, fl['temporal_mapping_multiprocessing'],
-                                   data_reuse_threshold, PE_RF_size_threshold, PE_depth,
-                                   CHIP_depth, area_max_arch, area_utilization_arch,
-                                   mem_ratio, memory_pool, banking, L1_size, L2_size, unrolling_size_list,
-                                   unrolling_scheme_list, unrolling_scheme_list_text, memory_scheme_hint, mh_name,
-                                   fl['spatial_utilization_threshold'], sumx, stationary_optimization_enable,
-                                   fl['spatial_unrolling_multiprocessing'], fl['save_all_architecture_result'],
-                                   fl['save_all_spatial_unrolling_result'], fl['save_all_temporal_mapping_result'],
-                                   fl['result_print_mode'], fl['im2col_enable_for_all_layers'],
-                                   fl['im2col_enable_for_pointwise_layers'], memory_unroll_fully_flexible,
-                                   fl['result_print_type'], save_results_on_the_fly, max_nb_lpf_layer)
+    input_settings_cfg = InputSettings(settings_cfg['result_path'], settings_cfg['result_filename'], settings_cfg['layer_filename'],
+                                       layer_indices, settings_cfg['layer_multiprocessing'], precision,
+                                       mac_array_info, mac_array_stall, settings_cfg['fixed_architecture'],
+                                       settings_cfg['architecture_search_multiprocessing'], memory_scheme_hint,
+                                       settings_cfg['fixed_spatial_unrolling'], sm_fixed, flooring_fixed,
+                                       settings_cfg['fixed_temporal_mapping'], tm_fixed, tmg_search_method,
+                                       tmg_search_space, settings_cfg['temporal_mapping_multiprocessing'],
+                                       data_reuse_threshold, PE_RF_size_threshold, PE_depth,
+                                       CHIP_depth, area_max_arch, area_utilization_arch,
+                                       mem_ratio, memory_pool, banking, L1_size, L2_size, unrolling_size_list,
+                                       unrolling_scheme_list, unrolling_scheme_list_text, memory_scheme_hint, mh_name,
+                                       settings_cfg['spatial_utilization_threshold'], sumx, stationary_optimization_enable,
+                                       settings_cfg['spatial_unrolling_multiprocessing'], settings_cfg['save_all_architecture_result'],
+                                       settings_cfg['save_all_spatial_unrolling_result'], settings_cfg['save_all_temporal_mapping_result'],
+                                       settings_cfg['result_print_mode'], settings_cfg['im2col_enable_for_all_layers'],
+                                       settings_cfg['im2col_enable_for_pointwise_layers'], memory_unroll_fully_flexible,
+                                       settings_cfg['result_print_type'], save_results_on_the_fly, max_nb_lpf_layer)
 
-    return input_settings
+    return input_settings_cfg
 
 
 class layer_spec1(object):
@@ -356,8 +357,8 @@ def get_layer_spec(input_settings, model=None):
         layer_numbers = update_layer_spec(layer_spec, model)
 
     for layer_number, specs in layer_spec.layer_info.items():
-        if layer_number in layer_numbers: # Only care about layers we have to process
-            G = specs.get('G',1)
+        if layer_number in layer_numbers:  # Only care about layers we have to process
+            G = specs.get('G', 1)
             C = specs['C']
             K = specs['K']
 
@@ -370,7 +371,7 @@ def get_layer_spec(input_settings, model=None):
                 layer_spec.layer_info[layer_number]['K'] = div_K
 
                 print("Grouped convolution detected for %s Layer %d. Terminal prints will show total energy of all groups combined."
-                    % (input_settings.layer_filename.split('/')[-1], layer_number))
+                      % (input_settings.layer_filename.split('/')[-1], layer_number))
     print()
     return layer_spec, layer_numbers
 
