@@ -13,6 +13,7 @@ from datetime import datetime
 import evaluate
 from classes.multi_manager import MultiManager
 from im2col_funcs import im2col_layer_transform
+import yaml
 
 if __name__ == "__main__":
 
@@ -23,7 +24,13 @@ if __name__ == "__main__":
     parser.add_argument("--set", help="Path to the main setting file")
     args = parser.parse_args()
 
-    input_settings = input_funcs.get_input_settings(args.set, args.map, args.mempool, args.arch)
+    with open(args.set) as settings_file, open(args.map) as mapping_file, open(args.mempool) as memory_pool_file, open(args.arch) as architecture_file:
+        settings = yaml.safe_load(settings_file)
+        mapping = yaml.safe_load(mapping_file)
+        memory_pool = yaml.safe_load(memory_pool_file)
+        architecture = yaml.safe_load(architecture_file)
+        input_settings = input_funcs.get_input_settings(settings, mapping, memory_pool, architecture)
+
 
     '''
     Neural Network info can be defined by user (./NN_layer/XXNet.py) or be imported externally.
