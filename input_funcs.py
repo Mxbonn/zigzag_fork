@@ -291,11 +291,8 @@ def get_input_settings(settings_cfg, mapping_cfg, memory_pool_cfg, architecture_
     else:
         sumx = 0
 
-    if type(settings_cfg['layer_indices']) is list:
-        layer_indices = settings_cfg['layer_indices']
-    else:
-        NN = importlib.machinery.SourceFileLoader('%s' % (settings_cfg['layer_filename']), '%s.py' % (settings_cfg['layer_filename'])).load_module()
-        layer_indices = [kk for kk in NN.layer_info.keys()]
+    layer_indices = settings_cfg.get('layer_indices', None)
+    layer_filename = settings_cfg.get('layer_filename', None)
 
     try:
         save_results_on_the_fly = settings_cfg['save_results_on_the_fly']
@@ -306,7 +303,7 @@ def get_input_settings(settings_cfg, mapping_cfg, memory_pool_cfg, architecture_
     except:
         max_nb_lpf_layer = 20
 
-    input_settings_cfg = InputSettings(settings_cfg['result_path'], settings_cfg['result_filename'], settings_cfg['layer_filename'],
+    input_settings_cfg = InputSettings(settings_cfg['result_path'], settings_cfg['result_filename'], layer_filename,
                                        layer_indices, settings_cfg['layer_multiprocessing'], precision,
                                        mac_array_info, mac_array_stall, settings_cfg['fixed_architecture'],
                                        settings_cfg['architecture_search_multiprocessing'], memory_scheme_hint,
@@ -332,30 +329,7 @@ class layer_spec1(object):
         self.layer_info = {}
 
 
-def get_layer_spec(input_settings, model=None):
-    """
-    Function that gets the layer_spec according from the input_settings
-    If a Keras model is provided, it will update the layer spec accordingly
-
-
-    Arguments
-    =========
-
-    - input_settings: The input settings to get the layer_spec file location
-
-    - model: A keras model that constitutes of a number of Conv2D layers
-
-    """
-    if input_settings:
-        layer_filename = input_settings.layer_filename
-        layer_spec = importlib.machinery.SourceFileLoader('%s' % (layer_filename), '%s.py' % (layer_filename)).load_module()
-        layer_numbers = input_settings.layer_number
-    else:
-        layer_spec = layer_spec1()
-
-    if model is not None:
-        layer_numbers = update_layer_spec(layer_spec, model)
-
+def convert_group_convolutions(layer_spec, layer_numbers):
     for layer_number, specs in layer_spec.layer_info.items():
         if layer_number in layer_numbers:  # Only care about layers we have to process
             G = specs.get('G', 1)
@@ -370,28 +344,45 @@ def get_layer_spec(input_settings, model=None):
                 layer_spec.layer_info[layer_number]['C'] = div_C
                 layer_spec.layer_info[layer_number]['K'] = div_K
 
-                print("Grouped convolution detected for %s Layer %d. Terminal prints will show total energy of all groups combined."
-                      % (input_settings.layer_filename.split('/')[-1], layer_number))
+                print(f"Grouped convolution detected for Layer {layer_number}: {layer_spec.layer_info[layer_number]}. Terminal prints will show total energy of all groups combined.")
     print()
     return layer_spec, layer_numbers
 
 
-def update_layer_spec(layer_spec, model):
+def get_layer_spec(input_settings):
+    """
+    Function that gets the layer_spec according from the input_settings
+
+    Arguments
+    =========
+
+    - input_settings: The input settings to get the layer_spec file location
+
+    """
+    layer_filename = input_settings.layer_filename
+    layer_numbers = input_settings.layer_number
+    layer_spec = importlib.machinery.SourceFileLoader('%s' % (layer_filename), '%s.py' % (layer_filename)).load_module()
+    if layer_numbers == "ALL":
+        layer_numbers = [kk for kk in layer_spec.layer_info.keys()]
+        input_settings.layer_number = layer_numbers
+
+    layer_spec, layer_numbers = convert_group_convolutions(layer_spec, layer_numbers)
+    return layer_spec, layer_numbers
+
+
+def get_layer_spec_keras_model(model):
     """
     Function that changes the layer_spec according to a keras model.
 
     Arguments
     =========
-    - layer_spec: The layer_spec module that will be updated
-
-    - input_settings: The input settings, needed to update the layer_number variable
-
     - model: A keras model that constitutes of a number of Conv2D layers
 
     """
     import keras
 
     # Clear any entries present in layer_spec
+    layer_spec = layer_spec1()
     layer_spec.layer_info = {}
     layer_numbers = []
     layer_ii = 0
@@ -536,4 +527,5 @@ def update_layer_spec(layer_spec, model):
             # Add this layer number to layer_numbers
             layer_numbers.append(layer_ii)
 
-    return layer_numbers
+    layer_spec, layer_numbers = convert_group_convolutions(layer_spec, layer_numbers)
+    return layer_spec, layer_numbers

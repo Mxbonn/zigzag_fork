@@ -41,11 +41,11 @@ if __name__ == "__main__":
     # ---------------------------------------------------------------------------
     # import keras.applications
     # load_model = keras.applications.MobileNet()
-    # layer_spec, layer_numbers = input_funcs.get_layer_spec(None, model=load_model)
+    # layer_spec, layer_numbers = input_funcs.get_layer_spec_keras_model(load_model)
     # input_settings.layer_number = layer_numbers
     # input_settings.layer_filename = '../../' + load_model.name
     # ---------------------------------------------------------------------------
-    layer_spec, _ = input_funcs.get_layer_spec(input_settings, model=None)
+    layer_spec, _ = input_funcs.get_layer_spec(input_settings)
 
     # Extract the layer information from the layer_spec
     layers = [cls.Layer.extract_layer_info(layer_spec.layer_info[layer_number])
