@@ -103,6 +103,10 @@ class Layer(object):
         self.is_duplicate = True
         self.parent = other_layer_number
 
+    def __repr__(self):
+        return f"B_{self.B}_K_{self.K}_C_{self.C}_OY_{self.OY}_OX_{self.OX}_FY_{self.FY}_FX_{self.FX}_SY_{self.SY}_SX_{self.SX}_SFY_{self.SFY}_" \
+               f"SFX_{self.SFX}_PY_{self.PY}_PX_{self.PX}_G_{self.G}"
+
     @classmethod
     def extract_layer_info(cls, info):
         return cls(info["B"],

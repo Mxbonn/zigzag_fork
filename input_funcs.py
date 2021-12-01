@@ -292,7 +292,7 @@ def get_input_settings(settings_cfg, mapping_cfg, memory_pool_cfg, architecture_
         sumx = 0
 
     layer_indices = settings_cfg.get('layer_indices', None)
-    layer_filename = settings_cfg.get('layer_filename', None)
+    layer_filename = settings_cfg.get('layer_filename', "")
 
     try:
         save_results_on_the_fly = settings_cfg['save_results_on_the_fly']

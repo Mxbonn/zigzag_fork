@@ -1753,12 +1753,7 @@ def print_yaml(
         # Because YAML is a superset of json, we can write our output in the
         # json format, which is simpler to read and sufficient here, and we
         # still have a valid YAML output.
-        if verbose:
-            json.dump(yaml_dictionary, yaml_file)
-        else:
-            # If the output is meant to be concise, we try to make it human
-            # readable (at least a little) by indenting it correctly.
-            json.dump(yaml_dictionary, yaml_file, indent=4)
+        json.dump(yaml_dictionary, yaml_file, indent=4)
 
     if cost_model_output in [None, [], {}]:
         # L means layer index, M means memory scheme count, SU means spatial
@@ -1872,8 +1867,9 @@ def print_helper(input_settings, layers, layers_saved, multi_manager):
 
                         sub_path = '/all_su_best_tm/'
 
-                        rf_en = (rf_base % sub_path) + '_L' + str(layer_index) + mem_scheme_su_save_str + rf_ending_en
-                        rf_ut = (rf_base % sub_path) + '_L' + str(layer_index) + mem_scheme_su_save_str + rf_ending_ut
+                        layer_global_str = f"L({layers_saved[j]})"
+                        rf_en = (rf_base % sub_path) + layer_global_str + mem_scheme_su_save_str + rf_ending_en
+                        rf_ut = (rf_base % sub_path) + layer_global_str + mem_scheme_su_save_str + rf_ending_ut
 
                         if input_settings.im2col_enable_pw and (input_settings.spatial_unrolling_mode not in [4, 5]) \
                                 and (input_settings.fixed_temporal_mapping is False):
@@ -1934,8 +1930,9 @@ def print_helper(input_settings, layers, layers_saved, multi_manager):
 
                     sub_path = '/best_su_best_tm/'
 
-                    rf_en = (rf_base % sub_path) + '_L' + str(layer_index) + mem_scheme_su_save_str_en + rf_ending_en
-                    rf_ut = (rf_base % sub_path) + '_L' + str(layer_index) + mem_scheme_su_save_str_ut + rf_ending_ut
+                    layer_global_str = f"L({layers_saved[j]})"
+                    rf_en = (rf_base % sub_path) + layer_global_str + mem_scheme_su_save_str_en + rf_ending_en
+                    rf_ut = (rf_base % sub_path) + layer_global_str + mem_scheme_su_save_str_ut + rf_ending_ut
 
                     if input_settings.im2col_enable_pw and (input_settings.spatial_unrolling_mode not in [4, 5]) \
                             and (input_settings.fixed_temporal_mapping is False):
@@ -2002,8 +1999,9 @@ def print_helper(input_settings, layers, layers_saved, multi_manager):
 
             sub_path = '/best_mem_each_layer/'
 
-            rf_en = (rf_base % sub_path) + '_L' + str(layer_index) + mem_scheme_su_save_str_en + rf_ending_en
-            rf_ut = (rf_base % sub_path) + '_L' + str(layer_index) + mem_scheme_su_save_str_ut + rf_ending_ut
+            layer_global_str = f"L({layers_saved[j]})"
+            rf_en = (rf_base % sub_path) + layer_global_str + mem_scheme_su_save_str_en + rf_ending_en
+            rf_ut = (rf_base % sub_path) + layer_global_str + mem_scheme_su_save_str_ut + rf_ending_ut
 
             if input_settings.im2col_enable_pw and (input_settings.spatial_unrolling_mode not in [4, 5]) \
                     and (input_settings.fixed_temporal_mapping is False):
@@ -2064,8 +2062,9 @@ def print_helper(input_settings, layers, layers_saved, multi_manager):
 
             sub_path = '/best_mem_network/'
 
-            rf_en = (rf_base % sub_path) + '_L' + str(layer_index) + mem_scheme_su_save_str_en + rf_ending_en
-            rf_ut = (rf_base % sub_path) + '_L' + str(layer_index) + mem_scheme_su_save_str_ut + rf_ending_ut
+            layer_global_str = f"L({layers_saved[j]})"
+            rf_en = (rf_base % sub_path) + layer_global_str + mem_scheme_su_save_str_en + rf_ending_en
+            rf_ut = (rf_base % sub_path) + layer_global_str + mem_scheme_su_save_str_ut + rf_ending_ut
 
             if input_settings.im2col_enable_pw and (input_settings.spatial_unrolling_mode not in [4, 5]) \
                     and (input_settings.fixed_temporal_mapping is False):
@@ -2089,7 +2088,6 @@ def print_helper(input_settings, layers, layers_saved, multi_manager):
             else:
                 print_yaml(rf_en, layer, msc_en, best_output_energy, common_settings_en, tm_count_en, sim_time_en, input_settings.result_print_mode)
                 print_yaml(rf_ut, layer, msc_ut, best_output_utilization, common_settings_ut, tm_count_ut, sim_time_ut, input_settings.result_print_mode)
-
 
 class CostModelOutput:
 
